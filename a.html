@@ -3,59 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Local File Viewer & Downloader</title>
+    <title>Archive File Viewer & Downloader</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
     <style>
-        /* CSS for the black background */
+        /* CSS for the black background and dark theme */
         body {
             background-color: black;
             color: white; /* Make text visible */
-            font-family: Arial, sans-serif;
+            font-family: 'Courier New', monospace; /* Monospaced font for file viewing */
             padding: 20px;
         }
         .container {
             max-width: 800px;
             margin: auto;
         }
+        h1 {
+            color: #00ff00; /* Neon green header */
+            text-shadow: 0 0 5px #00ff00;
+        }
+        label, strong {
+            color: #00cc00;
+        }
         textarea {
             width: 100%;
             height: 300px;
-            background-color: #333;
+            background-color: #111;
             color: #eee;
-            border: 1px solid #555;
+            border: 1px solid #00ff00;
             padding: 10px;
             margin-top: 15px;
             box-sizing: border-box;
             resize: vertical;
         }
+        input[type="file"] {
+            margin-top: 10px;
+            padding: 5px;
+            background-color: #333;
+            border: 1px solid #00cc00;
+            color: white;
+        }
         button {
             padding: 10px 15px;
-            background-color: #007bff;
+            background-color: #555;
             color: white;
-            border: none;
+            border: 1px solid #777;
             cursor: pointer;
             margin-right: 10px;
+            font-weight: bold;
         }
         button:hover {
-            background-color: #0056b3;
+            background-color: #00cc00;
+            color: black;
+        }
+        hr {
+            border-top: 1px solid #333;
+            margin: 20px 0;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📁 Local File Viewer</h1>
-        <p>This application works in your browser only. Files are **not** uploaded to a server.</p>
+        <h1>💾 Archive File Viewer</h1>
+        <p>This tool processes files locally in your browser. **No files are uploaded to any server.**</p>
 
-        <label for="fileInput">**1. Select a file:**</label>
-        <input type="file" id="fileInput" accept=".txt, .html, .css, .js" onchange="loadFile()">
+        <label for="fileInput">**1. Select a File (.zip, .txt, .html, etc.):**</label>
+        <input type="file" id="fileInput" onchange="loadFile()">
         
         <hr>
 
-        <label for="fileContent">**2. View File Content:**</label>
-        <textarea id="fileContent" readonly placeholder="The contents of the selected file will appear here."></textarea>
+        <label for="fileContent">**2. File Content/ZIP Index:**</label>
+        <textarea id="fileContent" readonly placeholder="Select a file above. If it's a ZIP, the list of contained files will appear here."></textarea>
         
         <hr>
 
-        <button id="downloadButton" onclick="downloadFile()" disabled>⬇️ **3. Download Original File**</button>
+        <button id="downloadButton" onclick="downloadFile()" disabled>⬇️ **3. Download Selected File**</button>
     </div>
 
     <script>
@@ -65,7 +88,8 @@
         let selectedFile = null;
 
         /**
-         * Loads the selected file into the textarea for viewing.
+         * Loads the selected file. If it's a ZIP, it lists the contents.
+         * If it's a text file, it displays the content.
          */
         function loadFile() {
             if (fileInput.files.length === 0) {
@@ -78,8 +102,46 @@
             selectedFile = fileInput.files[0];
             downloadButton.disabled = false;
             
-            // For simplicity, we only read text-based files
-            if (selectedFile.type.match('text.*') || selectedFile.name.match(/\.(txt|html|css|js|json|xml)$/i)) {
+            // --- ZIP FILE HANDLING ---
+            if (selectedFile.name.toLowerCase().endsWith('.zip') || selectedFile.type === 'application/zip') {
+                fileContent.value = `Reading ZIP file: ${selectedFile.name}...`;
+                
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    // Use JSZip to load the binary data
+                    JSZip.loadAsync(event.target.result)
+                        .then(function(zip) {
+                            let contentList = `Archive: ${selectedFile.name}\nTotal files: ${Object.keys(zip.files).length}\n\n`;
+                            contentList += `--- Contents ---\n`;
+                            
+                            // Iterate through each file inside the ZIP
+                            zip.forEach(function (relativePath, zipEntry) {
+                                // Exclude directories from the list
+                                if (!zipEntry.dir) {
+                                    // Convert size from bytes to KB
+                                    const sizeKB = (zipEntry.uncompressedSize / 1024).toFixed(2);
+                                    contentList += `${relativePath} (${sizeKB} KB)\n`;
+                                } else {
+                                    contentList += `${relativePath}\n`;
+                                }
+                            });
+                            
+                            fileContent.value = contentList;
+                        }, function (e) {
+                            fileContent.value = `Error loading ZIP file:\n${e.message}`;
+                        });
+                };
+                reader.onerror = function() {
+                    fileContent.value = 'Error reading file.';
+                };
+                
+                // Read the file as an ArrayBuffer (binary data) for JSZip
+                reader.readAsArrayBuffer(selectedFile);
+            } 
+            
+            // --- STANDARD TEXT FILE HANDLING ---
+            else if (selectedFile.type.match('text.*') || selectedFile.name.match(/\.(txt|html|css|js|json|xml|md)$/i)) {
+                fileContent.value = `Reading text file: ${selectedFile.name}...`;
                 const reader = new FileReader();
                 reader.onload = function(event) {
                     fileContent.value = event.target.result;
@@ -89,8 +151,11 @@
                 };
                 // Read the file as text
                 reader.readAsText(selectedFile);
-            } else {
-                fileContent.value = `File type (${selectedFile.type || 'unknown'}) is not supported for viewing as text. You can still download it.`;
+            } 
+            
+            // --- OTHER FILES ---
+            else {
+                fileContent.value = `File type (${selectedFile.type || 'unknown'}) is not supported for content viewing. File size: ${(selectedFile.size / 1024).toFixed(2)} KB.`;
             }
         }
 
@@ -115,7 +180,7 @@
             document.body.appendChild(a);
             a.click();
             
-            // Clean up by revoking the temporary URL and removing the link
+            // Clean up
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
