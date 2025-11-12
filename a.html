@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local File Viewer & Downloader</title>
+    <style>
+        /* CSS for the black background */
+        body {
+            background-color: black;
+            color: white; /* Make text visible */
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            background-color: #333;
+            color: #eee;
+            border: 1px solid #555;
+            padding: 10px;
+            margin-top: 15px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📁 Local File Viewer</h1>
+        <p>This application works in your browser only. Files are **not** uploaded to a server.</p>
+
+        <label for="fileInput">**1. Select a file:**</label>
+        <input type="file" id="fileInput" accept=".txt, .html, .css, .js" onchange="loadFile()">
+        
+        <hr>
+
+        <label for="fileContent">**2. View File Content:**</label>
+        <textarea id="fileContent" readonly placeholder="The contents of the selected file will appear here."></textarea>
+        
+        <hr>
+
+        <button id="downloadButton" onclick="downloadFile()" disabled>⬇️ **3. Download Original File**</button>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const fileContent = document.getElementById('fileContent');
+        const downloadButton = document.getElementById('downloadButton');
+        let selectedFile = null;
+
+        /**
+         * Loads the selected file into the textarea for viewing.
+         */
+        function loadFile() {
+            if (fileInput.files.length === 0) {
+                fileContent.value = '';
+                downloadButton.disabled = true;
+                selectedFile = null;
+                return;
+            }
+
+            selectedFile = fileInput.files[0];
+            downloadButton.disabled = false;
+            
+            // For simplicity, we only read text-based files
+            if (selectedFile.type.match('text.*') || selectedFile.name.match(/\.(txt|html|css|js|json|xml)$/i)) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    fileContent.value = event.target.result;
+                };
+                reader.onerror = function() {
+                    fileContent.value = 'Error reading file.';
+                };
+                // Read the file as text
+                reader.readAsText(selectedFile);
+            } else {
+                fileContent.value = `File type (${selectedFile.type || 'unknown'}) is not supported for viewing as text. You can still download it.`;
+            }
+        }
+
+        /**
+         * Triggers a download of the currently selected file.
+         */
+        function downloadFile() {
+            if (!selectedFile) {
+                alert('Please select a file first.');
+                return;
+            }
+            
+            // Create a temporary URL for the file data
+            const url = URL.createObjectURL(selectedFile);
+            
+            // Create a temporary link element
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = selectedFile.name; // Use the original file name
+            
+            // Programmatically click the link to start the download
+            document.body.appendChild(a);
+            a.click();
+            
+            // Clean up by revoking the temporary URL and removing the link
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
